@@ -127,7 +127,8 @@ DFA* remove_indistinguishable(DFA* in_dfa)
 match states new index");
 		for (j = 0; j < chars; j++)
 		{
-			transition_function[last_group][j] = in_dfa->transition_func[i][j];
+			transition_function[last_group][j] =
+				indist_states[in_dfa->transition_func[i][j]];
 		}
 	}
 	assert_cond(last_group + 1 == new_index, "Number of rows added to transition \
