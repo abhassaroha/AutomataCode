@@ -1,5 +1,5 @@
-#ifndef MINIMIZE__DFA__H
-#define MINIMIZE__DFA__H
+#ifndef AUTOMATA_MINIMIZE__DFA__H
+#define AUTOMATA_MINIMIZE__DFA__H
 
 #include "data_types.h"
 #include "errno.h"

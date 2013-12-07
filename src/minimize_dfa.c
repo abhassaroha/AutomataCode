@@ -130,8 +130,8 @@ match states new index");
 			transition_function[last_group][j] = in_dfa->transition_func[i][j];
 		}
 	}
-	assert_cond(last_group == new_index, "Number of rows added to transition \
-function does not match state count. LG: %d, NI: %d", last_group, new_index);
+	assert_cond(last_group + 1 == new_index, "Number of rows added to transition \
+function does not match new state count. LG: %d, NI: %d", last_group, new_index);
 
 	out_dfa->transition_func = transition_function;
 	out_dfa->num_char = chars;
@@ -189,11 +189,16 @@ DFA* parse_dfa(char* file_name)
 	}
 	fscanf(in_file, "%d", &num_final_states);
 	printf("Final states: %d\n", num_final_states);
+	assert_cond(num_states >= num_final_states, " Number of final\
+states is greater than number of states, Num Final: %d, Num States: %d",
+	num_final_states, num_states);
 	printf("Final state:\t"); 
 	int* final = (int*) malloc(sizeof(int)*num_final_states);
 	for (i = 0; i < num_final_states; i++)
 	{
 		fscanf(in_file, "%d", &final[i]);
+		assert_cond(final[i] < num_states, "final state index is greater\
+than number of states. Index: %d, Total States: %d", final[i], num_states);
 		printf("%d\t", final[i]);
 	}
 	printf("\n");
