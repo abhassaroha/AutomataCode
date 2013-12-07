@@ -6,9 +6,9 @@
 #include "assert.h"
 #include "stdio.h"
 
-#define assert_cond(cond, message)\
+#define assert_cond(cond, message, ...)\
 	if(!cond) {\
-		printf(message);\
+		printf(message, ##__VA_ARGS__);\
 		printf("\n");\
 		assert(cond);\
 	}

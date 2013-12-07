@@ -121,17 +121,17 @@ DFA* remove_indistinguishable(DFA* in_dfa)
 	int last_group = -1;
 	for (i = 0; i < states; i++)
 	{
-		if (indist_states[i] < last_group) continue;
+		if (indist_states[i] <= last_group) continue;
 		transition_function[++last_group] = (int*) malloc(sizeof(int)*chars);
 		assert_cond(last_group == indist_states[i], "Group being considered does not\
-				match states new index");
+match states new index");
 		for (j = 0; j < chars; j++)
 		{
 			transition_function[last_group][j] = in_dfa->transition_func[i][j];
 		}
 	}
 	assert_cond(last_group == new_index, "Number of rows added to transition \
-			function does not match state count");
+function does not match state count. LG: %d, NI: %d", last_group, new_index);
 
 	out_dfa->transition_func = transition_function;
 	out_dfa->num_char = chars;
@@ -162,9 +162,43 @@ DFA* parse_dfa(char* file_name)
 {
 	int num_char, num_states, num_final_states;
 	// TODO: parse dfa file
+	FILE* in_file = fopen(file_name, "r");
+	if (!in_file) {
+		printf("Error opening file: %s", strerror(errno));
+		exit(1);
+	}
+
+	printf("In DFA\n\n");
+	fscanf(in_file, "%d", &num_char);
+	printf("Num char %d \n", num_char);
+	fscanf(in_file, "%d", &num_states);
+	printf("Num states %d \n", num_states);
 	int** transition_array = (int**) malloc(sizeof(int*)*num_states); 
+	int i, j;
+	printf("Transition Function:\n");
+	for (i = 0; i < num_states; i++)
+	{
+		printf("%d:", i);
+		transition_array[i] = (int*) malloc(sizeof(int)*num_char);
+		for (j = 0; j < num_char; j++)
+		{
+			fscanf(in_file, "%d", &transition_array[i][j]);
+			printf("\t%d", transition_array[i][j]);
+		}
+		printf("\n");
+	}
+	fscanf(in_file, "%d", &num_final_states);
+	printf("Final states: %d\n", num_final_states);
+	printf("Final state:\t"); 
 	int* final = (int*) malloc(sizeof(int)*num_final_states);
-	DFA* in_dfa;
+	for (i = 0; i < num_final_states; i++)
+	{
+		fscanf(in_file, "%d", &final[i]);
+		printf("%d\t", final[i]);
+	}
+	printf("\n");
+
+	DFA* in_dfa = (DFA*) malloc(sizeof(DFA));
 	in_dfa->transition_func = transition_array;
 	in_dfa->num_char = num_char;
 	in_dfa->num_states = num_states;
@@ -175,16 +209,30 @@ DFA* parse_dfa(char* file_name)
  
 int main(int argc, char** argv)
 {
-
-	DFA* out_dfa = minimize_dfa(parse_dfa("dfa1"));
+	int i, j;
+	if (argc < 2) {
+		exit(1);
+	}
+	DFA* out_dfa = minimize_dfa(parse_dfa(argv[1]));
+	printf("\n\nOut DFA\n\n");
 	printf("Num states %d \n", out_dfa->num_states);
 	printf("Num char %d \n", out_dfa->num_char);
 	printf("Transition Function:\n");
-	printf("0:\t%d\t%d\n", out_dfa->transition_func[0][0],
-			out_dfa->transition_func[0][1]);
-	printf("0:\t%d\t%d\n", out_dfa->transition_func[1][0],
-			out_dfa->transition_func[1][1]);
+	for (i = 0; i < out_dfa->num_states; i++)
+	{
+		printf("%d:", i);
+		for (j = 0; j < out_dfa->num_char; j++)
+		{
+			printf("\t%d", out_dfa->transition_func[i][j]);
+		}
+		printf("\n");
+	}
 	printf("Final states: %d\n", out_dfa->num_final_states);
-	printf("Final state: %d\n", out_dfa->final_states[0]);
+	printf("Final state:\t"); 
+	for (i = 0; i < out_dfa->num_final_states; i++)
+	{
+		printf("%d\t", out_dfa->final_states[i]);
+	}
+	printf("\n");
 	return 0;
 }
