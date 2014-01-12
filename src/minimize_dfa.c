@@ -22,6 +22,52 @@ DFA* remove_unreachable(DFA* in_dfa)
 	return out_dfa; 
 }
 
+#ifdef HOPCROFT_ALGO
+// Hopcroft's partitioning into equivalence set
+// algorithm.
+DFA* remove_indistinguishable(DFA* in_dfa)
+{
+	int i, j;
+	// vector of nodes
+	DoubleList* doub_list_nodes = (DoubleList*) malloc(sizeof(DoubleList) * 
+			in_dfa->num_states);
+	for (i = 0; i < in_dfa->num_states; i++) {
+		double_list_nodes[i].state_num = i;
+		double_list_nodes[i].previous = double_list_nodes[i].next = NULL;
+	}
+	DoubleList** blocks = (DoubleList**) malloc(sizeof(DoubleList*) 
+			* in_dfa->num_states);
+
+	for (i = 0; i < in_dfa->num_final_states; i++)
+		blocks[0] = double_list_insert(blocks[0], 
+				&double_list_nodes[in_dfa->final_states[i]]);
+
+	for (i = 0; i < in_dfa->num_states; i++) {
+		if (double_list_nodes[i].previous == NULL && double_list_nodes[i].next == NULL)
+			blocks[1] = double_list_insert(blocks[1], &double_list_nodes[i]); 
+	}
+
+	List*** inverse_trans = (List***) malloc(sizeof(List**) * in_dfa->num_states);
+	for (i = 0; i < in_dfa->num_char; i++) 
+		inverse_trans[i] = (List**) malloc(sizeof(List*) * in_dfa->num_char);
+
+	List* list_node;
+	for (i = 0; i < in_dfa->num_states; i++) {
+		for (j = 0; j < in_dfa->num_char; j++) {
+			list_node = (List*) malloc(sizeof(List));
+			list_node->state_num = i;
+			list_insert(inverse_trans[in_dfa->transition_func[i][j]][j], list_node);
+		}
+	}
+
+	// TODO: do the refinements
+
+	DFA* out_dfa;
+	return out_dfa;
+}
+#else
+// The inductive discovery algorithm for 
+// finding distinguishable pairs
 DFA* remove_indistinguishable(DFA* in_dfa)
 {
 	int i, j;
@@ -151,6 +197,7 @@ function does not match new state count. LG: %d, NI: %d", last_group, new_index)
 
 	return out_dfa; 
 }
+#endif
 
 DFA* minimize_dfa(DFA* in_dfa)
 {
@@ -162,7 +209,6 @@ DFA* minimize_dfa(DFA* in_dfa)
 DFA* parse_dfa(char* file_name)
 {
 	int num_char, num_states, num_final_states;
-	// TODO: parse dfa file
 	FILE* in_file = fopen(file_name, "r");
 	if (!in_file) {
 		printf("Error opening file: %s", strerror(errno));
@@ -217,6 +263,8 @@ int main(int argc, char** argv)
 {
 	int i, j;
 	if (argc < 2) {
+		printf("Insufficient arguments\n");
+		printf("Usage: min_dfa <DFA_FILE>\n");
 		exit(1);
 	}
 	DFA* out_dfa = minimize_dfa(parse_dfa(argv[1]));
