@@ -16,7 +16,8 @@ DoubleList* double_list_insert(DoubleList* head, DoubleList* node)
 DoubleList* double_list_remove(DoubleList* head, DoubleList* node) 
 {
 	assert_cond(head, "Empty list");
-	node->next->previous = node->previous;
+	if (node->next)
+		node->next->previous = node->previous;
 	if (node == head) {
 		head = node->next;
 	}

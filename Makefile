@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-c -Wall
+CFLAGS=-g -c -Wall
 IFLAGS=-I ./src
 DFLAGS=-DHOPCROFT_ALGO
 

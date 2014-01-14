@@ -17,18 +17,9 @@ List* list_search(List* head, List* node)
 			result = current;
 			break;
 		}
+		current = current->next;
 	}
 	return result;
-}
-
-List* list_remove_from_front(List *head) 
-{
-	assert_cond(head, "Empty list");
-	List* node;
-	node = head;
-	head = head->next;
-	node->next = NULL;
-	return node; 
 }
 
 List* list_remove(List* head, List* node)
