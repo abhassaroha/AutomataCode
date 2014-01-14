@@ -4,6 +4,8 @@
  */
 
 #include "minimize_dfa.h"
+#include "string.h"
+#include "common.h"
 
 // This transformation is inverse of itself.
 #define REVERSE_INDEX(__NUM__, __INDEX__) (__NUM__) - (__INDEX__) - 1 
@@ -16,64 +18,188 @@ if (FIRST > SECOND) {\
 	SECOND = temp;\
 }
 
-DFA* remove_unreachable(DFA* in_dfa)
+DFA *remove_unreachable(DFA *in_dfa)
 {
-	DFA* out_dfa = (DFA*) malloc(sizeof(DFA));
+	DFA *out_dfa = (DFA*) malloc(sizeof(DFA));
 	return out_dfa; 
 }
 
 #ifdef HOPCROFT_ALGO
-// Hopcroft's partitioning into equivalence set
-// algorithm.
-DFA* remove_indistinguishable(DFA* in_dfa)
+
+#define DOUBLE_LIST_INSERT(STATE, BLOCK_NUM)\
+	blocks[BLOCK_NUM]->head = double_list_insert(blocks[BLOCK_NUM]->head, &dbl_lst_nodes[STATE]);\
+	dbl_lst_nodes[STATE].block_num = BLOCK_NUM;\
+	for (j = 0; j < in_dfa->num_char; j++) {\
+		if (inv_trans[STATE][j] != 0)\
+		blocks[BLOCK_NUM]->count[j]++;\
+	}
+
+#define DOUBLE_LIST_REMOVE(STATE, BLOCK_NUM)\
+	blocks[BLOCK_NUM]->head = double_list_remove(blocks[BLOCK_NUM]->head, &dbl_lst_nodes[STATE]);\
+	for (j = 0; j < in_dfa->num_char; j++) {\
+		if (inv_trans[STATE][j] != 0)\
+		blocks[BLOCK_NUM]->count[j]--;\
+	}
+
+InverseTrans*** crt_inv_transtn_tbl(DFA *in_dfa, DoubleList *nodes)
 {
 	int i, j;
-	// vector of nodes
-	DoubleList* doub_list_nodes = (DoubleList*) malloc(sizeof(DoubleList) * 
-			in_dfa->num_states);
-	for (i = 0; i < in_dfa->num_states; i++) {
-		double_list_nodes[i].state_num = i;
-		double_list_nodes[i].previous = double_list_nodes[i].next = NULL;
-	}
-	DoubleList** blocks = (DoubleList**) malloc(sizeof(DoubleList*) 
-			* in_dfa->num_states);
-
-	for (i = 0; i < in_dfa->num_final_states; i++)
-		blocks[0] = double_list_insert(blocks[0], 
-				&double_list_nodes[in_dfa->final_states[i]]);
-
-	for (i = 0; i < in_dfa->num_states; i++) {
-		if (double_list_nodes[i].previous == NULL && double_list_nodes[i].next == NULL)
-			blocks[1] = double_list_insert(blocks[1], &double_list_nodes[i]); 
-	}
-
-	List*** inverse_trans = (List***) malloc(sizeof(List**) * in_dfa->num_states);
-	for (i = 0; i < in_dfa->num_char; i++) 
-		inverse_trans[i] = (List**) malloc(sizeof(List*) * in_dfa->num_char);
-
-	List* list_node;
-	for (i = 0; i < in_dfa->num_states; i++) {
+	// Create inverse transition table.
+	InverseTrans ***inv_trans = (InverseTrans***) 
+		malloc(sizeof(InverseTrans**) * in_dfa->num_states);
+	for (i = 0; i < in_dfa->num_states; i++) { 
+		inv_trans[i] = (InverseTrans**) 
+			malloc(sizeof(InverseTrans*) * in_dfa->num_char);
 		for (j = 0; j < in_dfa->num_char; j++) {
-			list_node = (List*) malloc(sizeof(List));
-			list_node->state_num = i;
-			list_insert(inverse_trans[in_dfa->transition_func[i][j]][j], list_node);
+			inv_trans[i][j] = (InverseTrans*) malloc(sizeof(InverseTrans));
+			inv_trans[i][j]->list = NULL;
+			inv_trans[i][j]->count = 0;
 		}
 	}
 
-	// TODO: do the refinements
+	List *list_node;
+	int target;
+	for (i = 0; i < in_dfa->num_states; i++) {
+		for (j = 0; j < in_dfa->num_char; j++) {
+			list_node = (List*) malloc(sizeof(List));
+			list_node->dbl_lst = &nodes[i];
+			list_node->state_num = i;
+			target = in_dfa->transition_func[i][j];
+			inv_trans[target][j]->count++;
+			list_insert(inv_trans[target][j]->list, list_node);
+		}
+	}
+	return inv_trans;
+}
 
-	DFA* out_dfa;
+// Hopcroft's partitioning into equivalence set
+// algorithm.
+DFA *remove_indistinguishable(DFA *in_dfa)
+{
+	int i, j, num_states = 2;
+
+	// vector of nodes
+	DoubleList *dbl_lst_nodes = (DoubleList*) malloc(sizeof(DoubleList) * 
+			in_dfa->num_states);
+	for (i = 0; i < in_dfa->num_states; i++) {
+		dbl_lst_nodes[i].state_num = i;
+		dbl_lst_nodes[i].previous = dbl_lst_nodes[i].next = NULL;
+	}
+
+	InverseTrans ***inv_trans = crt_inv_transtn_tbl(in_dfa, dbl_lst_nodes);
+
+	Block **blocks = (Block**) malloc(sizeof(Block*) 
+			* in_dfa->num_states);
+	for (i = 0; i < in_dfa->num_final_states; i++) {
+		blocks[i] = (Block*) malloc(sizeof(Block));
+		blocks[i]->count = (int*) malloc(sizeof(int)*in_dfa->num_char);;
+		memset(blocks[i]->count, 0, in_dfa->num_char*sizeof(int));
+		blocks[i]->head = NULL;
+	}
+
+	int state;
+	for (i = 0; i < in_dfa->num_final_states; i++) {
+		state = in_dfa->final_states[i];
+		DOUBLE_LIST_INSERT(state, 0);
+	}
+
+	for (i = 0; i < in_dfa->num_states; i++) {
+		if (dbl_lst_nodes[i].previous == NULL && dbl_lst_nodes[i].next == NULL) {
+			DOUBLE_LIST_INSERT(i, 1);
+		}
+	}
+
+	List **l_sets = (List**) malloc(sizeof(List*)*in_dfa->num_char);
+	for (i = 0; i < in_dfa->num_char; i++)
+		l_sets[i] = NULL;
+
+	// init L sets for each char
+	List *node;
+	for (i = 0; i < in_dfa->num_char; i++) {
+		node = (List*) malloc(sizeof(List));
+		if (blocks[0]->count[i] < blocks[1]->count[i])
+			node->state_num = 0;
+		else node->state_num = 1;
+		list_insert(l_sets[i], node);
+	}
+
+	List *frm_state;
+	DoubleList *to_state;
+	int *trans_map = (int*) malloc(sizeof(int) * in_dfa->num_states);
+	int block_num,state_num;
+	memset(trans_map, -1, sizeof(int) * in_dfa->num_states);
+
+	while (1) {
+		// pick one set from L and one char
+		for (i = 0; i < in_dfa->num_char; i++) { 
+			if (l_sets[i] != NULL)
+				break;
+		}
+		if (i != in_dfa->num_char) {
+			node = list_remove_from_front(l_sets[i]);
+			state_num = node->state_num;
+			free(node);
+			// refine using that set and char
+			// put blocks on copy list
+			to_state = blocks[state_num]->head; 
+			while (to_state != NULL) {
+				frm_state = inv_trans[to_state->state_num][i]->list;
+				while (frm_state != NULL) {
+					block_num = frm_state->dbl_lst->block_num;
+					if (trans_map[block_num] == -1)
+						trans_map[block_num] = num_states++;
+					frm_state = frm_state->next;
+				}
+				to_state = to_state->next;
+			}
+			// copy blocks
+			to_state = blocks[state_num]->head; 
+			while (to_state != NULL) {
+				frm_state = inv_trans[to_state->state_num][i]->list;
+				while (frm_state != NULL) {
+					block_num = frm_state->dbl_lst->block_num;
+					DOUBLE_LIST_REMOVE(frm_state->state_num, block_num);
+					DOUBLE_LIST_INSERT(frm_state->state_num, trans_map[block_num]);
+				}
+			}
+			// remove blocks from copy list
+			// update a(i) and L sets for new blocks
+			to_state = blocks[state_num]->head; 
+			while (to_state != NULL) {
+				frm_state = inv_trans[to_state->state_num][i]->list;
+				while (frm_state != NULL) {
+					block_num = frm_state->dbl_lst->block_num;
+					if (trans_map[block_num] != -1) {
+						node = (List*) malloc(sizeof(List));
+						if (blocks[block_num]->count[i] < blocks[trans_map[block_num]]->count[i]) 
+							node->state_num = block_num;
+						else 
+							node->state_num = trans_map[block_num];
+						if (list_search(l_sets[i], node) == NULL)
+							list_insert(l_sets[i], node);
+						trans_map[block_num] = -1;
+					}
+					frm_state = frm_state->next;
+				}
+				to_state = to_state->next;
+			}
+		}
+		else break;
+	}
+
+	DFA *out_dfa = (DFA*) malloc(sizeof(DFA));
+	// free up the memory
 	return out_dfa;
 }
 #else
 // The inductive discovery algorithm for 
 // finding distinguishable pairs
-DFA* remove_indistinguishable(DFA* in_dfa)
+DFA *remove_indistinguishable(DFA *in_dfa)
 {
 	int i, j;
 	int states = in_dfa->num_states;
 	int chars = in_dfa->num_char;
-	int* final_states = (int*) malloc(sizeof(int)*states);
+	int *final_states = (int*) malloc(sizeof(int)*states);
 	memset(final_states, 0, states*sizeof(int));
 	// copy over final states info
 	for (i = 0; i < in_dfa->num_final_states; i++)
@@ -86,7 +212,7 @@ DFA* remove_indistinguishable(DFA* in_dfa)
 	// rows are stored from 0 but last state does not have
 	// a row.
 	// Only the upper triangle is of interest.
-	int** dist_pairs = (int**) malloc(sizeof(int*) * (states - 1));	
+	int **dist_pairs = (int**) malloc(sizeof(int*) * (states - 1));	
   // Base case:
 	// distinguish final and non-final
 	for (i = 0; i < states - 1; i++)
@@ -131,8 +257,8 @@ DFA* remove_indistinguishable(DFA* in_dfa)
 	} while (added); // keep doing till last iteration produced a new pair
 
 	int new_index = 0, num_final = 0;
-	int* indist_states = (int*) malloc(sizeof(int)*states);
-	int* new_final_states = (int*) malloc(sizeof(int)*states);
+	int *indist_states = (int*) malloc(sizeof(int)*states);
+	int *new_final_states = (int*) malloc(sizeof(int)*states);
 	for (i = 0; i < states; i++)
 		indist_states[i] = -1;
 
@@ -162,8 +288,8 @@ DFA* remove_indistinguishable(DFA* in_dfa)
 		new_index++;
 	}
 
-	DFA* out_dfa = (DFA*) malloc(sizeof(DFA));
-	int** transition_function = (int**) malloc(sizeof(int*)*new_index);
+	DFA *out_dfa = (DFA*) malloc(sizeof(DFA));
+	int **transition_function = (int**) malloc(sizeof(int*)*new_index);
 	int last_group = -1;
 	for (i = 0; i < states; i++)
 	{
@@ -199,17 +325,17 @@ function does not match new state count. LG: %d, NI: %d", last_group, new_index)
 }
 #endif
 
-DFA* minimize_dfa(DFA* in_dfa)
+DFA *minimize_dfa(DFA *in_dfa)
 {
 	//DFA* out_dfa = remove_unreachable(in_dfa);
-	DFA* out_dfa = remove_indistinguishable(in_dfa);
+	DFA *out_dfa = remove_indistinguishable(in_dfa);
 	return out_dfa;
 }
 
-DFA* parse_dfa(char* file_name)
+DFA *parse_dfa(char *file_name)
 {
 	int num_char, num_states, num_final_states;
-	FILE* in_file = fopen(file_name, "r");
+	FILE *in_file = fopen(file_name, "r");
 	if (!in_file) {
 		printf("Error opening file: %s", strerror(errno));
 		exit(1);
@@ -220,7 +346,7 @@ DFA* parse_dfa(char* file_name)
 	printf("Num char %d \n", num_char);
 	fscanf(in_file, "%d", &num_states);
 	printf("Num states %d \n", num_states);
-	int** transition_array = (int**) malloc(sizeof(int*)*num_states); 
+	int **transition_array = (int**) malloc(sizeof(int*)*num_states); 
 	int i, j;
 	printf("Transition Function:\n");
 	for (i = 0; i < num_states; i++)
@@ -240,7 +366,7 @@ DFA* parse_dfa(char* file_name)
 states is greater than number of states, Num Final: %d, Num States: %d",
 	num_final_states, num_states);
 	printf("Final state:\t"); 
-	int* final = (int*) malloc(sizeof(int)*num_final_states);
+	int *final = (int*) malloc(sizeof(int)*num_final_states);
 	for (i = 0; i < num_final_states; i++)
 	{
 		fscanf(in_file, "%d", &final[i]);
@@ -250,7 +376,7 @@ than number of states. Index: %d, Total States: %d", final[i], num_states);
 	}
 	printf("\n");
 
-	DFA* in_dfa = (DFA*) malloc(sizeof(DFA));
+	DFA *in_dfa = (DFA*) malloc(sizeof(DFA));
 	in_dfa->transition_func = transition_array;
 	in_dfa->num_char = num_char;
 	in_dfa->num_states = num_states;
@@ -259,7 +385,7 @@ than number of states. Index: %d, Total States: %d", final[i], num_states);
 	return in_dfa;
 }
  
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
 	int i, j;
 	if (argc < 2) {
@@ -267,7 +393,7 @@ int main(int argc, char** argv)
 		printf("Usage: min_dfa <DFA_FILE>\n");
 		exit(1);
 	}
-	DFA* out_dfa = minimize_dfa(parse_dfa(argv[1]));
+	DFA *out_dfa = minimize_dfa(parse_dfa(argv[1]));
 	printf("\n\nOut DFA\n\n");
 	printf("Num states %d \n", out_dfa->num_states);
 	printf("Num char %d \n", out_dfa->num_char);
