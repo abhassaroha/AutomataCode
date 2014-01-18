@@ -4,8 +4,12 @@
 #include "double_list.h"
 
 typedef struct __List {
-	DoubleList* dbl_lst;
-	int state_num;
+	DoubleList* dbl_node;
+	union {
+		int state_num;
+		int block_num;
+	};
+	int to_move;
 	struct __List *next;
 } List;
 

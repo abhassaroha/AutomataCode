@@ -1,7 +1,8 @@
 CC=gcc
-CFLAGS=-g -c -Wall
+CFLAGS=-c -Wall
 IFLAGS=-I ./src
 DFLAGS=-DHOPCROFT_ALGO
+#DFLAGS=
 
 all:
 	echo "There is no all"

@@ -30,20 +30,42 @@ DFA *remove_unreachable(DFA *in_dfa)
 
 #ifdef HOPCROFT_ALGO
 
-#define DOUBLE_LIST_INSERT(STATE, BLOCK_NUM)\
-	blocks[BLOCK_NUM]->head = double_list_insert(blocks[BLOCK_NUM]->head, &dbl_lst_nodes[STATE]);\
+#define DOUBLE_LIST_INSERT(STATE, BLOCK_NUM, HEAD)\
+	blocks[BLOCK_NUM]->HEAD = double_list_insert(blocks[BLOCK_NUM]->HEAD,\
+			&dbl_lst_nodes[STATE]);\
 	dbl_lst_nodes[STATE].block_num = BLOCK_NUM;\
+	blocks[BLOCK_NUM]->num_elem++;\
 	for (j = 0; j < in_dfa->num_char; j++) {\
 		if (inv_trans_func[STATE][j]->count != 0)\
-		blocks[BLOCK_NUM]->count[j]++;\
+		blocks[BLOCK_NUM]->elem_count[j]++;\
 	}
 
-#define DOUBLE_LIST_REMOVE(STATE, BLOCK_NUM)\
-	blocks[BLOCK_NUM]->head = double_list_remove(blocks[BLOCK_NUM]->head, &dbl_lst_nodes[STATE]);\
+#define DOUBLE_LIST_REMOVE(STATE, BLOCK_NUM, HEAD)\
+	blocks[BLOCK_NUM]->HEAD = double_list_remove(blocks[BLOCK_NUM]->HEAD,\
+			&dbl_lst_nodes[STATE]);\
+	blocks[BLOCK_NUM]->num_elem--;\
 	for (j = 0; j < in_dfa->num_char; j++) {\
 		if (inv_trans_func[STATE][j]->count != 0)\
-		blocks[BLOCK_NUM]->count[j]--;\
+		blocks[BLOCK_NUM]->elem_count[j]--;\
 	}
+
+DoubleList* create_dbl_lst_nodes(int num_states)
+{
+	// vector of nodes
+	DoubleList *dbl_lst_nodes = (DoubleList*) malloc(sizeof(DoubleList) * num_states);
+	for (int i = 0; i < num_states; i++) {
+		dbl_lst_nodes[i].state_num = i;
+		dbl_lst_nodes[i].block_num = -1;
+		dbl_lst_nodes[i].to_move = 0;
+		dbl_lst_nodes[i].previous = dbl_lst_nodes[i].next = NULL;
+	}
+	return dbl_lst_nodes;
+}
+
+void destroy_dbl_lst_nodes(DoubleList* dbl_lst_nodes)
+{
+	free(dbl_lst_nodes);
+}
 
 InverseTrans*** crt_inv_transtn_tbl(DFA *in_dfa, DoubleList *nodes)
 {
@@ -66,53 +88,95 @@ InverseTrans*** crt_inv_transtn_tbl(DFA *in_dfa, DoubleList *nodes)
 	for (i = 0; i < in_dfa->num_states; i++) {
 		for (j = 0; j < in_dfa->num_char; j++) {
 			list_node = (List*) malloc(sizeof(List));
-			list_node->dbl_lst = &nodes[i];
+			list_node->dbl_node = &nodes[i];
 			list_node->state_num = i;
 			target = in_dfa->transition_func[i][j];
 			inv_trans_func[target][j]->count++;
-			inv_trans_func[target][j]->list = list_insert(inv_trans_func[target][j]->list, list_node);
+			inv_trans_func[target][j]->list = list_insert(inv_trans_func[target][j]->list,
+					list_node);
 		}
 	}
 	return inv_trans_func;
 }
 
-// Hopcroft's partitioning into equivalence set
-// algorithm.
-DFA *remove_indistinguishable(DFA *in_dfa)
+void destroy_inv_transtn_tbl(InverseTrans*** inv_trans_func, DFA* in_dfa)
 {
-	int i, j, num_states = 2;
-
-	// vector of nodes
-	DoubleList *dbl_lst_nodes = (DoubleList*) malloc(sizeof(DoubleList) * 
-			in_dfa->num_states);
-	for (i = 0; i < in_dfa->num_states; i++) {
-		dbl_lst_nodes[i].state_num = i;
-		dbl_lst_nodes[i].previous = dbl_lst_nodes[i].next = NULL;
+	for (int i = 0; i < in_dfa->num_states; i++) {
+		for (int j = 0; j < in_dfa->num_char; j++) {
+			free(inv_trans_func[i][j]);
+		}
+		free(inv_trans_func[i]);
 	}
+	free(inv_trans_func);
+}
 
-	InverseTrans ***inv_trans_func = crt_inv_transtn_tbl(in_dfa, dbl_lst_nodes);
-
-	Block **blocks = (Block**) malloc(sizeof(Block*) 
-			* in_dfa->num_states);
+Block** initialize_blocks(DFA *in_dfa, DoubleList *dbl_lst_nodes, InverseTrans ***inv_trans_func)
+{
+	int i,j;
+	// vector of blocks
+	Block **blocks = (Block**) malloc(sizeof(Block*) * in_dfa->num_states);
 	for (i = 0; i < in_dfa->num_states; i++) {
 		blocks[i] = (Block*) malloc(sizeof(Block));
-		blocks[i]->count = (int*) malloc(sizeof(int)*in_dfa->num_char);;
-		memset(blocks[i]->count, 0, in_dfa->num_char*sizeof(int));
 		blocks[i]->head = NULL;
+		blocks[i]->move_head = NULL;
+		blocks[i]->elem_count = (int*) malloc(sizeof(int)*in_dfa->num_char);
+		memset(blocks[i]->elem_count, 0, in_dfa->num_char*sizeof(int));
+		blocks[i]->num_elem = 0;
+		blocks[i]->move_count = 0;
 	}
 
 	int state;
 	for (i = 0; i < in_dfa->num_final_states; i++) {
 		state = in_dfa->final_states[i];
-		DOUBLE_LIST_INSERT(state, 0);
+		DOUBLE_LIST_INSERT(state, 0, head);
 	}
 
 	for (i = 0; i < in_dfa->num_states; i++) {
-		if (dbl_lst_nodes[i].previous == NULL && dbl_lst_nodes[i].next == NULL) {
-			DOUBLE_LIST_INSERT(i, 1);
+		if (dbl_lst_nodes[i].block_num == -1) {
+			DOUBLE_LIST_INSERT(i, 1, head);
 		}
 	}
 
+	return blocks;
+}
+
+void destroy_blocks(Block** blocks, int num_states)
+{
+	for (int i = 0; i < num_states; i++) {
+		free(blocks[i]);
+	}
+	free(blocks);
+}
+
+void print_blocks(Block** blocks, int num_states, int num_char)
+{
+	DoubleList* dbl_node;
+	for (int i = 0; i < num_states; i++) {
+		printf("Block %d\n", i);
+#if 0
+		for (int j = 0; j < num_char; j++)
+			printf("%d ", blocks[i]->elem_count[j]); 
+		printf("\n");
+#endif
+		dbl_node = blocks[i]->head;
+		if (dbl_node) {
+			printf("%d", dbl_node->state_num);
+			dbl_node = dbl_node->next;
+			while (dbl_node) {
+				printf(" -> ");
+				printf("%d", dbl_node->state_num);
+				dbl_node = dbl_node->next;
+			}
+			printf("\n");
+		}
+		else printf("empty!\n");
+	}
+	printf("\n\n");
+}
+
+List** initialize_l_sets(DFA* in_dfa, Block** blocks)
+{
+	int i;
 	List **l_sets = (List**) malloc(sizeof(List*)*in_dfa->num_char);
 	for (i = 0; i < in_dfa->num_char; i++)
 		l_sets[i] = NULL;
@@ -121,21 +185,66 @@ DFA *remove_indistinguishable(DFA *in_dfa)
 	List *node;
 	for (i = 0; i < in_dfa->num_char; i++) {
 		node = (List*) malloc(sizeof(List));
-		if (blocks[0]->count[i] < blocks[1]->count[i])
+		if (blocks[0]->elem_count[i] <= blocks[1]->elem_count[i] 
+				&& blocks[0]->elem_count[i] != 0) {
 			node->state_num = 0;
-		else node->state_num = 1;
-		l_sets[i] = list_insert(l_sets[i], node);
+			l_sets[i] = list_insert(l_sets[i], node);
+		}
+		else if(blocks[1]->elem_count[i] != 0) {
+			node->state_num = 1;
+			l_sets[i] = list_insert(l_sets[i], node);
+		}
+		else if (blocks[0]->elem_count[i] != 0) {
+			node->state_num = 0;
+			l_sets[i] = list_insert(l_sets[i], node);
+		}
+	}
+	return l_sets;
+}
+
+void destroy_l_sets(List** l_sets)
+{
+	free(l_sets);
+}
+
+#if 0
+void print_l_sets(List** l_sets, int num_char)
+{
+	List *node;
+	for (int i = 0; i < num_char; i++) {
+		printf("Lset num %d\n", i);
+		node = l_sets[i];
+		if (node) {
+			printf("%d", node->state_num);
+			node = node->next;
+			while(node) printf(" -> %d", node->state_num);
+		}
+		printf("\n");
+	}
+}
+#endif
+
+int refine_blocks(DFA *in_dfa, InverseTrans ***inv_trans_func, List **l_sets,
+		Block **blocks, DoubleList* dbl_lst_nodes)
+{
+	int i, j, num_states = 2, ref_block, from_block;
+	List *frm_state, *node;
+	DoubleList *dbl_node, *to_state;
+	List *move_head = NULL;
+	List *move_nde_lst = (List*) malloc(sizeof(List) 
+			* in_dfa->num_states);
+	for (i = 0; i < in_dfa->num_states; i++) {
+		move_nde_lst[i].block_num = i;
+		move_nde_lst[i].to_move = 0;
+		move_nde_lst[i].next = NULL;
 	}
 
-	List *frm_state;
-	DoubleList *to_state;
-	int ref_block, to_block, from_block;
-	int *trans_map = (int*) malloc(sizeof(int) * in_dfa->num_states);
-	int* inv_trans_map = (int*) malloc(sizeof(int) * in_dfa->num_states);
-	memset(trans_map, -1, sizeof(int) * in_dfa->num_states);
-	memset(inv_trans_map, -1, sizeof(int) * in_dfa->num_states);
 
 	while (1) {
+#if 0
+		print_l_sets(l_sets, in_dfa->num_char);
+		print_blocks(blocks, num_states, in_dfa->num_char);
+#endif
 		// pick one set from L and one char
 		for (i = 0; i < in_dfa->num_char; i++) { 
 			if (l_sets[i] != NULL)
@@ -152,62 +261,139 @@ DFA *remove_indistinguishable(DFA *in_dfa)
 			while (to_state != NULL) {
 				frm_state = inv_trans_func[to_state->state_num][i]->list;
 				while (frm_state != NULL) {
-					from_block = frm_state->dbl_lst->block_num;
-					if (trans_map[from_block] == -1 && from_block != ref_block) {
-						trans_map[from_block] = num_states;
-						inv_trans_map[num_states] = from_block;
-						num_states++;
+					dbl_node = frm_state->dbl_node;
+					from_block = dbl_node->block_num;
+					if (from_block != ref_block 
+							&& dbl_node->to_move == 0) {
+						blocks[from_block]->head = double_list_remove(blocks[from_block]->head,
+								dbl_node);
+						blocks[from_block]->move_head = double_list_insert(
+								blocks[from_block]->move_head,
+								dbl_node);
+						dbl_node->to_move = 1;
+						if (move_nde_lst[from_block].to_move == 0) {
+							move_head = list_insert(move_head, &move_nde_lst[from_block]);
+							move_nde_lst[from_block].to_move = 1;
+						}
+						blocks[from_block]->move_count++;
 					}
 					frm_state = frm_state->next;
 				}
 				to_state = to_state->next;
 			} // put on copy list
-			// copy blocks
-			// TODO: don't allow all elems to move to new block
-			to_state = blocks[ref_block]->head; 
-			while (to_state != NULL) {
-				frm_state = inv_trans_func[to_state->state_num][i]->list;
-				while (frm_state != NULL) {
-					from_block = frm_state->dbl_lst->block_num;
-					if (from_block != ref_block) {
-						DOUBLE_LIST_REMOVE(frm_state->state_num, from_block);
-						DOUBLE_LIST_INSERT(frm_state->state_num, trans_map[from_block]);
-					}
-					frm_state = frm_state->next;
-				}
-				to_state = to_state->next;
-			} // copy list
-			// remove blocks from copy list
-			// update a(i) and L sets for new blocks
-			to_state = blocks[ref_block]->head; 
-			while (to_state != NULL) {
-				frm_state = inv_trans_func[to_state->state_num][i]->list;
-				while (frm_state != NULL) {
-					to_block = frm_state->dbl_lst->block_num;
-					if (inv_trans_map[to_block] != -1) {
+			while (move_head) {
+				from_block = move_head->block_num;
+				if (blocks[from_block]->move_count != blocks[from_block]->num_elem) {
+					// copy to new block 
+					dbl_node = blocks[from_block]->move_head;
+					do {
+						DOUBLE_LIST_REMOVE(dbl_node->state_num, from_block, move_head);
+						DOUBLE_LIST_INSERT(dbl_node->state_num, num_states, head);
+						dbl_node->to_move = 0;
+						dbl_node = blocks[from_block]->move_head;
+					} while (dbl_node);
+					// update l_sets
+					for (j = 0; j < in_dfa->num_char; j++) {
 						node = (List*) malloc(sizeof(List));
-						if (blocks[to_block]->count[i] < blocks[inv_trans_map[to_block]]->count[i]) 
-							node->state_num = to_block;
-						else 
-							node->state_num = inv_trans_map[to_block];
-						if (list_search(l_sets[i], node) == NULL)
-							l_sets[i] = list_insert(l_sets[i], node);
-						trans_map[inv_trans_map[to_block]] = -1;
-						inv_trans_map[to_block] = -1;
+						if (blocks[num_states]->elem_count[j] <= blocks[from_block]->elem_count[j]
+								&& blocks[num_states]->elem_count[j] != 0) {
+							node->state_num = num_states;
+							l_sets[j] = list_insert(l_sets[j], node);
+						} 
+						else if (blocks[from_block]->elem_count[j] != 0) { 
+							node->state_num = from_block;
+							if (list_search(l_sets[j], node) == NULL)
+								l_sets[j] = list_insert(l_sets[j], node);
+						}
+						else if (blocks[num_states]->elem_count[j] != 0) {
+							node->state_num = num_states;
+							l_sets[j] = list_insert(l_sets[j], node);
+						}
 					}
-					frm_state = frm_state->next;
+					num_states++;
 				}
-				to_state = to_state->next;
-			} // reset
+				else {
+					// copy back from move head to head
+					dbl_node = blocks[from_block]->move_head;
+					do {
+						blocks[from_block]->move_head = double_list_remove(
+								blocks[from_block]->move_head,
+								dbl_node);
+						blocks[from_block]->head = double_list_insert(blocks[from_block]->head,
+								dbl_node);
+						dbl_node->to_move = 0;
+						dbl_node = blocks[from_block]->move_head;
+					} while (dbl_node);
+				}
+				blocks[from_block]->move_count = 0;
+				move_head->to_move = 0;
+				move_head = list_remove(move_head, move_head);
+			}
 		} // if i found
 		else {
 			break;
 		}
 	}
-	printf("Num states %d\n", num_states);
 
+	free(move_nde_lst);
+	printf("Num states %d\n", num_states);
+	print_blocks(blocks, num_states, in_dfa->num_char);
+	return num_states;
+}
+
+// Hopcroft's partitioning into equivalence set
+// algorithm.
+DFA *remove_indistinguishable(DFA *in_dfa)
+{
+	DoubleList* dbl_lst_nodes = create_dbl_lst_nodes(in_dfa->num_states);
+	InverseTrans ***inv_trans_func = crt_inv_transtn_tbl(in_dfa, dbl_lst_nodes);
+	Block **blocks = initialize_blocks(in_dfa, dbl_lst_nodes, inv_trans_func); 
+	List **l_sets = initialize_l_sets(in_dfa, blocks);
+	int num_states = refine_blocks(in_dfa, inv_trans_func, l_sets, blocks, dbl_lst_nodes);
+
+	int state;
 	DFA *out_dfa = (DFA*) malloc(sizeof(DFA));
+	out_dfa->num_states = num_states;
+	out_dfa->num_char = in_dfa->num_char;
+	out_dfa->transition_func = (int**) malloc(sizeof(int*) * num_states);
+	out_dfa->num_final_states = 0;
+
+	int* old_final_states = (int*) malloc(sizeof(int) * in_dfa->num_states);
+	int* final_states = (int*) malloc(sizeof(int) * num_states);
+	memset(old_final_states, 0, sizeof(int) * in_dfa->num_states);
+	memset(final_states, 0, sizeof(int) * num_states);
+	for (int i = 0; i < in_dfa->num_final_states; i++) {
+		old_final_states[in_dfa->final_states[i]] = 1;
+	}
+
+	for (int i = 0; i < num_states; i++) {
+		out_dfa->transition_func[i] = (int*) malloc(sizeof(int) * in_dfa->num_char);
+		for (int j = 0; j < in_dfa->num_char; j++) {
+			state = in_dfa->transition_func[blocks[i]->head->state_num][j];
+			out_dfa->transition_func[i][j] = dbl_lst_nodes[state].block_num; 
+		}
+		state = blocks[i]->head->state_num;
+		if (old_final_states[state]) { 
+			final_states[i] = 1;
+			out_dfa->num_final_states++;
+		}
+	}
+
+	out_dfa->final_states = (int*) malloc(sizeof(int) * out_dfa->num_final_states);
+	int j = 0;
+	for (int i = 0; i < num_states; i++) {
+		if (final_states[i]) {
+			out_dfa->final_states[j] = i;
+			j++;
+		}
+	}
 	// free up the memory
+	free(final_states);
+	free(old_final_states);
+	destroy_l_sets(l_sets);
+	destroy_blocks(blocks, in_dfa->num_states);
+	destroy_inv_transtn_tbl(inv_trans_func, in_dfa);
+	destroy_dbl_lst_nodes(dbl_lst_nodes);
 	return out_dfa;
 }
 #else
@@ -360,6 +546,7 @@ DFA *parse_dfa(char *file_name)
 		exit(1);
 	}
 
+	printf("File Name %s\n\n", file_name);
 	printf("In DFA\n\n");
 	fscanf(in_file, "%d", &num_char);
 	printf("Num char %d \n", num_char);

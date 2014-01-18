@@ -4,6 +4,7 @@
 typedef struct __DoubleList {
 	int state_num;
 	int block_num;
+	int to_move;
 	struct __DoubleList *next;
 	struct __DoubleList *previous;
 } DoubleList;

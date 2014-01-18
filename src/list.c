@@ -4,8 +4,7 @@
 List* list_insert(List *head, List *node)
 {
 	node->next = head;
-	head = node;
-	return head;
+	return node;
 }
 
 List* list_search(List* head, List* node)
