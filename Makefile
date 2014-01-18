@@ -7,7 +7,7 @@ DFLAGS=-DHOPCROFT_ALGO
 all:
 	echo "There is no all"
 
-minimize_dfa_sources=src/minimize_dfa.c src/list.c src/double_list.c
+minimize_dfa_sources=src/minimize_dfa.c src/list.c src/double_list.c src/queue.c
 minimize_dfa_objects=$(minimize_dfa_sources:.c=.o)
 minimize_dfa: $(minimize_dfa_objects)
 	$(CC) $(IFLAGS) $(DFLAGS) $(minimize_dfa_objects) -o $@ 

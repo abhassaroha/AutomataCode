@@ -6,6 +6,7 @@
 #include "minimize_dfa.h"
 #include "string.h"
 #include "common.h"
+#include "queue.h"
 
 #ifndef HOPCROFT_ALGO
 
@@ -25,6 +26,74 @@ if (FIRST > SECOND) {\
 DFA *remove_unreachable(DFA *in_dfa)
 {
 	DFA *out_dfa = (DFA*) malloc(sizeof(DFA));
+	out_dfa->num_states = 0;
+
+	Queue* queue = create_queue();
+	queue_push(queue, 0);
+
+	int* reachable = (int*) malloc(sizeof(int) * in_dfa->num_states);
+	memset(reachable, 0, sizeof(int) * in_dfa->num_states);
+
+	int elem, c_elem;
+	while(!queue_empty(queue)) {
+		elem = queue_pop(queue);
+		if (!reachable[elem]) {
+			reachable[elem] = 1;
+			out_dfa->num_states++;
+			for (int j = 0; j < in_dfa->num_char; j++) {
+				c_elem = in_dfa->transition_func[elem][j];
+				if (!reachable[c_elem])
+					queue_push(queue, c_elem);
+			}
+		}
+	}
+
+// transition function
+	out_dfa->transition_func = (int**) malloc(sizeof(int*) 
+			* out_dfa->num_states);
+	int* state_map = (int*) malloc(sizeof(int) * in_dfa->num_states);
+	memset(state_map, -1, sizeof(int)*in_dfa->num_states);
+	int count = 0;
+	for (int i = 0; i < in_dfa->num_states; i++) {
+		if (reachable[i])
+			state_map[i] = count++; 
+	}
+	assert_cond(count == out_dfa->num_states, "element count mismatch");
+
+	for (int i = 0; i < in_dfa->num_states; i++) {
+		if (reachable[i]) {
+			out_dfa->transition_func[state_map[i]] = (int*) malloc(sizeof(int) 
+					* in_dfa->num_char);
+			for (int j = 0; j < in_dfa->num_char; j++) { 
+				assert_cond(state_map[in_dfa->transition_func[i][j]] != -1,
+						"Some reachable state did not get marked");
+				out_dfa->transition_func[state_map[i]][j] = 
+					state_map[in_dfa->transition_func[i][j]];
+			}
+		}
+	}
+
+	int* final = (int*) malloc(sizeof(int) * out_dfa->num_states);
+	out_dfa->num_final_states = 0;
+	memset(final, 0, sizeof(int) * out_dfa->num_states);
+	for (int i = 0; i < in_dfa->num_final_states; i++) {
+		int state;
+		state = state_map[in_dfa->final_states[i]];
+		if (state != -1) {
+			final[state] = 1;
+			out_dfa->num_final_states++;
+		}
+	}
+	assert_cond(out_dfa->num_final_states <= in_dfa->num_final_states,
+			"final states in new dfa should be less or equal");
+
+	out_dfa->final_states = (int*) malloc(sizeof(int) * out_dfa->num_final_states);
+	count = 0;
+	for (int i = 0; i < out_dfa->num_states; i++) {
+		if (final[i]) out_dfa->final_states[count++] = i;
+	}
+
+	out_dfa->num_char = in_dfa->num_char;
 	return out_dfa; 
 }
 
@@ -148,16 +217,15 @@ void destroy_blocks(Block** blocks, int num_states)
 	free(blocks);
 }
 
+#if DEBUG
 void print_blocks(Block** blocks, int num_states, int num_char)
 {
 	DoubleList* dbl_node;
 	for (int i = 0; i < num_states; i++) {
 		printf("Block %d\n", i);
-#if 0
 		for (int j = 0; j < num_char; j++)
 			printf("%d ", blocks[i]->elem_count[j]); 
 		printf("\n");
-#endif
 		dbl_node = blocks[i]->head;
 		if (dbl_node) {
 			printf("%d", dbl_node->state_num);
@@ -173,6 +241,7 @@ void print_blocks(Block** blocks, int num_states, int num_char)
 	}
 	printf("\n\n");
 }
+#endif
 
 List** initialize_l_sets(DFA* in_dfa, Block** blocks)
 {
@@ -207,7 +276,7 @@ void destroy_l_sets(List** l_sets)
 	free(l_sets);
 }
 
-#if 0
+#if DEBUG 
 void print_l_sets(List** l_sets, int num_char)
 {
 	List *node;
@@ -241,7 +310,7 @@ int refine_blocks(DFA *in_dfa, InverseTrans ***inv_trans_func, List **l_sets,
 
 
 	while (1) {
-#if 0
+#if DEBUG 
 		print_l_sets(l_sets, in_dfa->num_char);
 		print_blocks(blocks, num_states, in_dfa->num_char);
 #endif
@@ -336,8 +405,6 @@ int refine_blocks(DFA *in_dfa, InverseTrans ***inv_trans_func, List **l_sets,
 	}
 
 	free(move_nde_lst);
-	printf("Num states %d\n", num_states);
-	print_blocks(blocks, num_states, in_dfa->num_char);
 	return num_states;
 }
 
@@ -394,6 +461,11 @@ DFA *remove_indistinguishable(DFA *in_dfa)
 	destroy_blocks(blocks, in_dfa->num_states);
 	destroy_inv_transtn_tbl(inv_trans_func, in_dfa);
 	destroy_dbl_lst_nodes(dbl_lst_nodes);
+	for (int i = 0; i < in_dfa->num_states; i++)
+		free(in_dfa->transition_func[i]);
+	free(in_dfa->transition_func);
+	free(in_dfa->final_states);
+	free(in_dfa);
 	return out_dfa;
 }
 #else
@@ -532,8 +604,9 @@ function does not match new state count. LG: %d, NI: %d", last_group, new_index)
 
 DFA *minimize_dfa(DFA *in_dfa)
 {
-	//DFA* out_dfa = remove_unreachable(in_dfa);
-	DFA *out_dfa = remove_indistinguishable(in_dfa);
+	DFA* out_dfa = remove_unreachable(in_dfa);
+	printf("\nReachable states %d\n", out_dfa->num_states);
+	out_dfa = remove_indistinguishable(out_dfa);
 	return out_dfa;
 }
 
