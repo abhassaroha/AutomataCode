@@ -17,7 +17,9 @@ typedef struct __DFA
 	int num_final_states;
 } DFA;
 
-#include "list.h"
-#include "double_list.h"
+// generic elem with a number field.
+typedef struct __Elem {
+	int num;
+} Elem;
 
 #endif

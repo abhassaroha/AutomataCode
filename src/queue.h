@@ -1,15 +1,13 @@
 #ifndef AUTOMATA_QUEUE_H
 #define AUTOMATA_QUEUE_H
 
-typedef struct __QueueElem {
-	int num;
-} QueueElem;
+#include "data_types.h"
 
 typedef struct __Queue {
 	int head;
 	int tail;
 	int size;
-	QueueElem* block;
+	Elem* block;
 } Queue;
 
 Queue* create_queue();
