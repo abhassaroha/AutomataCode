@@ -1,12 +1,22 @@
-#include "parse_dfa.h"
+#include "common.h"
 
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <unistd.h>
 
-#include "common.h"
 #include "data_types.h"
+#include <string.h>
+
+void check_arg_count(int argc, int count, char* usage)
+{
+	if (argc < count) {
+		printf("Insufficient arguments\n");
+		printf("%s", usage);
+		printf("\n");
+		exit(1);
+	}
+}
 
 DFA *parse_dfa(char *file_name)
 {
@@ -61,4 +71,8 @@ than number of states. Index: %d, Total States: %d", final[i], num_states);
 	in_dfa->num_final_states = num_final_states;
 	return in_dfa;
 }
- 
+
+long get_page_size()
+{
+	return sysconf(_SC_PAGESIZE);
+}

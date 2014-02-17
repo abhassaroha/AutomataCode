@@ -7,8 +7,6 @@
 #include "string.h"
 #include "common.h"
 #include "queue.h"
-#include "parse_dfa.h"
-#include "check_args.h"
 
 #ifndef HOPCROFT_ALGO
 
@@ -25,11 +23,8 @@ if (FIRST > SECOND) {\
 
 #endif
 
-DFA *remove_unreachable(DFA *in_dfa)
+int* find_reachable(DFA *in_dfa, DFA *out_dfa)
 {
-	DFA *out_dfa = (DFA*) malloc(sizeof(DFA));
-	out_dfa->num_states = 0;
-
 	Queue* queue = create_queue();
 	queue_push(queue, 0);
 
@@ -49,11 +44,15 @@ DFA *remove_unreachable(DFA *in_dfa)
 			}
 		}
 	}
+	return reachable;
+}
 
-// transition function
+void create_transition_function(DFA *in_dfa, DFA *out_dfa, int *state_map)
+{
+	int* reachable = find_reachable(in_dfa, out_dfa);
+	// transition function
 	out_dfa->transition_func = (int**) malloc(sizeof(int*) 
 			* out_dfa->num_states);
-	int* state_map = (int*) malloc(sizeof(int) * in_dfa->num_states);
 	memset(state_map, -1, sizeof(int)*in_dfa->num_states);
 	int count = 0;
 	for (int i = 0; i < in_dfa->num_states; i++) {
@@ -75,6 +74,11 @@ DFA *remove_unreachable(DFA *in_dfa)
 		}
 	}
 
+	free(reachable);
+}
+
+void find_final_states(DFA *in_dfa, DFA *out_dfa, int *state_map)
+{
 	int* final = (int*) malloc(sizeof(int) * out_dfa->num_states);
 	out_dfa->num_final_states = 0;
 	memset(final, 0, sizeof(int) * out_dfa->num_states);
@@ -90,10 +94,24 @@ DFA *remove_unreachable(DFA *in_dfa)
 			"final states in new dfa should be less or equal");
 
 	out_dfa->final_states = (int*) malloc(sizeof(int) * out_dfa->num_final_states);
-	count = 0;
+	int count = 0;
 	for (int i = 0; i < out_dfa->num_states; i++) {
 		if (final[i]) out_dfa->final_states[count++] = i;
 	}
+
+	free(final);
+}
+
+
+DFA *remove_unreachable(DFA *in_dfa)
+{
+	DFA *out_dfa = (DFA*) malloc(sizeof(DFA));
+	out_dfa->num_states = 0;
+
+	int* state_map = (int*) malloc(sizeof(int) * in_dfa->num_states);
+	create_transition_function(in_dfa, out_dfa, state_map);
+	find_final_states(in_dfa, out_dfa, state_map);
+	free(state_map);
 
 	out_dfa->num_char = in_dfa->num_char;
 	return out_dfa; 
@@ -615,7 +633,7 @@ DFA *minimize_dfa(DFA *in_dfa)
 int main(int argc, char **argv)
 {
 	int i, j;
-	check_arg_count(argc, 2, "Usage: min_dfa <DFA_FILE>\n");
+	check_arg_count(argc, 2, "Usage: mindfa <DFA_FILE>\n");
 	DFA *out_dfa = minimize_dfa(parse_dfa(argv[1]));
 	printf("\n\nOut DFA\n\n");
 	printf("Num states %d \n", out_dfa->num_states);
