@@ -6,22 +6,24 @@ DFLAGS=-DHOPCROFT_ALGO
 
 all: mindfa rlempty
 
-mindfa_sources=src/minimize_dfa.c src/list.c src/double_list.c src/queue.c\
+mindfa_src=src/minimize_dfa.c src/list.c src/double_list.c src/queue.c\
 src/common.c src/is_reg_lang_empty.c src/stack.c
-mindfa_objects=$(mindfa_sources:.c=.o)
+mindfa_obj=$(patsubst src/%, bin/%, $(mindfa_src:.c=.o))
 
-mindfa: $(mindfa_objects)
-	$(CC) $(IFLAGS) $(mindfa_objects) -o $@ 
+mindfa: $(mindfa_obj)
+	$(CC) $(IFLAGS) $(mindfa_obj) -o bin/$@ 
 
 rlempty_src=src/reg_lang_empty.c src/is_reg_lang_empty.c src/common.c src/stack.c
-rlempty_obj=$(rlempty_src:.c=.o)
+rlempty_obj=$(patsubst src/%, bin/%, $(rlempty_src:.c=.o))
 
 rlempty: $(rlempty_obj) 
-	$(CC) $(IFLAGS) $(rlempty_obj) -o $@
+	$(CC) $(IFLAGS) $(rlempty_obj) -o bin/$@
 
-.c.o:
+bin/minimize_dfa.o: src/minimize_dfa.c
 	$(CC) $(DFLAGS) $(CFLAGS) $(IFLAGS) $< -o $@
+bin/%.o: src/%.c
+	$(CC) $(CFLAGS) $(IFLAGS) $< -o $@
 
 .PHONY: clean
 clean :
-	rm -rf ./src/*.o mindfa rlempty
+	rm -f ./bin/*.o bin/mindfa bin/rlempty
