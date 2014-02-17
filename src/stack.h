@@ -3,7 +3,17 @@
 
 #include "data_types.h"
 
-void stack_push(Stack *stack, Elem *elem);
-Stack* stack_pop(Stack *stack);
+typedef struct __Stack {
+	int tail;
+	int size;
+	Elem* block;
+} Stack;
+
+Stack* create_stack();
+void destroy_stack(Stack *stack);
+
+void stack_push(Stack *stack, int elem);
+int stack_pop(Stack *stack);
+int stack_empty(Stack *stack);
 
 #endif

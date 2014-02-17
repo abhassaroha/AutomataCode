@@ -11,6 +11,8 @@ typedef struct __Queue {
 } Queue;
 
 Queue* create_queue();
+void destroy_queue(Queue *queue);
+
 void queue_push(Queue* queue, int elem);
 int queue_pop(Queue* queue);
 int queue_empty(Queue* queue);

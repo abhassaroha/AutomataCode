@@ -1,19 +1,15 @@
 #include "queue.h"
-#include "common.h"
-#include "data_types.h"
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 
-long get_page_size()
-{
-	return sysconf(_SC_PAGESIZE);
-}
+#include "common.h"
+#include "data_types.h"
 
 Queue* create_queue()
 {
-	int page_size = get_page_size();
-	int size = page_size/sizeof(Elem);
+	int size = get_page_size()/sizeof(Elem);
 	Queue* queue = (Queue*) malloc(sizeof(Queue));
 	queue->block = (Elem*) malloc(size*sizeof(Elem));
 	queue->head = 0;
@@ -22,39 +18,49 @@ Queue* create_queue()
 	return queue;
 }
 
-void queue_push(Queue* queue, int elem)
+void destroy_queue(Queue *queue)
 {
-	int head = queue->head;
-	int tail = queue->tail;
-	int size = queue->size;
-	if (tail == size) {
-		if (head != 0) {
-			memmove(queue->block, &queue->block[head], (tail - head) * sizeof(Elem)); 
-			queue->tail = tail - head; queue->head = 0;
-		}
-		else {
-			size *= 2;
-			Elem* new_block = (Elem*) malloc(size*sizeof(Elem));
-			memcpy(new_block, queue->block, queue->size*sizeof(Elem));
-			free(queue->block);
-			queue->block = new_block;
-			queue->size = size;
-		}
-	}
-	queue->block[tail].num = elem;
-	queue->tail++;
+	free(queue->block);
+	free(queue);
 }
 
+/**
+ * Push the element to the queue.
+ * The queue does not overflow, but resizes when
+ * it has reached full capacity. When there is space
+ * at the beginning of memory block, data is shifted to fill
+ * in earlier bytes, otherwise underlying capacity is doubled.
+ */
+void queue_push(Queue* queue, int elem)
+{
+	if (queue->tail == queue->size) {
+		int old_size = queue->tail - queue->head;
+		if (queue->head != 0) {
+			memmove(queue->block, queue->block + queue->head, old_size * sizeof(Elem)); 
+			queue->head = 0; queue->tail = old_size;
+		}
+		else {
+			queue->size *= 2;
+			Elem* old_block = queue->block;
+			queue->block = (Elem*) malloc(queue->size * sizeof(Elem));
+			memcpy(queue->block, old_block, old_size * sizeof(Elem));
+			free(old_block);
+		}
+	}
+	queue->block[queue->tail++].num = elem;
+}
+
+/**
+ * Pop the element from queue.
+ * The queue will underflow if empty queue is popped.
+ */
 int queue_pop(Queue* queue)
 {
 	assert_cond(queue->head != queue->tail, "Queue underflow");
-	Elem* result = &queue->block[queue->head];
-	queue->head++;
-	return result->num;
+	return queue->block[queue->head++].num;
 }
 
 int queue_empty(Queue* queue)
 {
 	return queue->head == queue->tail;
 }
-
