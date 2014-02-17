@@ -7,6 +7,8 @@
 #include "string.h"
 #include "common.h"
 #include "queue.h"
+#include "is_reg_lang_empty.h"
+
 
 #ifndef HOPCROFT_ALGO
 /** 
@@ -439,16 +441,10 @@ int refine_blocks(DFA *in_dfa, InverseTrans ***inv_trans_func, List **l_sets,
 	return num_states;
 }
 
-// Hopcroft's partitioning into equivalence set
-// algorithm.
-DFA *remove_indistinguishable(DFA *in_dfa)
+DFA* create_out_dfa(DFA *in_dfa, DoubleList *dbl_lst_nodes,
+		Block **blocks, int num_states )
 {
-	DoubleList* dbl_lst_nodes = create_dbl_lst_nodes(in_dfa->num_states);
-	InverseTrans ***inv_trans_func = crt_inv_transtn_tbl(in_dfa, dbl_lst_nodes);
-	Block **blocks = initialize_blocks(in_dfa, dbl_lst_nodes, inv_trans_func); 
-	List **l_sets = initialize_l_sets(in_dfa, blocks);
-	int num_states = refine_blocks(in_dfa, inv_trans_func, l_sets, blocks, dbl_lst_nodes);
-
+	// Create out DFA
 	int state;
 	DFA *out_dfa = (DFA*) malloc(sizeof(DFA));
 	out_dfa->num_states = num_states;
@@ -456,6 +452,7 @@ DFA *remove_indistinguishable(DFA *in_dfa)
 	out_dfa->transition_func = (int**) malloc(sizeof(int*) * num_states);
 	out_dfa->num_final_states = 0;
 
+	// Calculate old final states.
 	int* old_final_states = (int*) malloc(sizeof(int) * in_dfa->num_states);
 	int* final_states = (int*) malloc(sizeof(int) * num_states);
 	memset(old_final_states, 0, sizeof(int) * in_dfa->num_states);
@@ -464,6 +461,7 @@ DFA *remove_indistinguishable(DFA *in_dfa)
 		old_final_states[in_dfa->final_states[i]] = 1;
 	}
 
+	// Create new transition function and mark new final states.
 	for (int i = 0; i < num_states; i++) {
 		out_dfa->transition_func[i] = (int*) malloc(sizeof(int) * in_dfa->num_char);
 		for (int j = 0; j < in_dfa->num_char; j++) {
@@ -477,6 +475,7 @@ DFA *remove_indistinguishable(DFA *in_dfa)
 		}
 	}
 
+	// create new final states list.
 	out_dfa->final_states = (int*) malloc(sizeof(int) * out_dfa->num_final_states);
 	int j = 0;
 	for (int i = 0; i < num_states; i++) {
@@ -485,18 +484,39 @@ DFA *remove_indistinguishable(DFA *in_dfa)
 			j++;
 		}
 	}
+
 	// free up the memory
 	free(final_states);
 	free(old_final_states);
+
+	return out_dfa;
+}
+
+
+// Hopcroft's partitioning into equivalence set
+// algorithm.
+DFA *remove_indistinguishable(DFA *in_dfa)
+{
+	DoubleList* dbl_lst_nodes = create_dbl_lst_nodes(in_dfa->num_states);
+	InverseTrans ***inv_trans_func = crt_inv_transtn_tbl(in_dfa, dbl_lst_nodes);
+	Block **blocks = initialize_blocks(in_dfa, dbl_lst_nodes, inv_trans_func); 
+	List **l_sets = initialize_l_sets(in_dfa, blocks);
+	int num_states = refine_blocks(in_dfa, inv_trans_func, l_sets, blocks,
+			dbl_lst_nodes);
 	destroy_l_sets(l_sets);
-	destroy_blocks(blocks, in_dfa->num_states);
 	destroy_inv_transtn_tbl(inv_trans_func, in_dfa);
+	DFA *out_dfa = create_out_dfa(in_dfa, dbl_lst_nodes, blocks, num_states);
+
+	// Free up memory
+	destroy_blocks(blocks, in_dfa->num_states);
 	destroy_dbl_lst_nodes(dbl_lst_nodes);
+	// Free up the in_dfa and associated data. 
 	for (int i = 0; i < in_dfa->num_states; i++)
 		free(in_dfa->transition_func[i]);
 	free(in_dfa->transition_func);
 	free(in_dfa->final_states);
 	free(in_dfa);
+
 	return out_dfa;
 }
 #else
@@ -635,6 +655,10 @@ function does not match new state count. LG: %d, NI: %d", last_group, new_index)
 
 DFA *minimize_dfa(DFA *in_dfa)
 {
+	if (is_reg_lang_empty(in_dfa)) {
+		printf("Input regular language is empty, can't be minimized!\n");
+		exit(EXIT_FAILURE);
+	}
 	DFA* out_dfa = remove_unreachable(in_dfa);
 	printf("Reachable states %d\n\n", out_dfa->num_states);
 	out_dfa = remove_indistinguishable(out_dfa);
