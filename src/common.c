@@ -61,7 +61,7 @@ states is greater than number of states, Num Final: %d, Num States: %d",
 than number of states. Index: %d, Total States: %d", final[i], num_states);
 		printf("%d\t", final[i]);
 	}
-	printf("\n");
+	printf("\n\n");
 
 	DFA *in_dfa = (DFA*) malloc(sizeof(DFA));
 	in_dfa->transition_func = transition_array;

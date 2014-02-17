@@ -9,6 +9,13 @@
 #include "queue.h"
 
 #ifndef HOPCROFT_ALGO
+/** 
+ * An implementation of :
+ *
+ * MR403320 (53 #7132) 68A25 (94A30) 
+ * Hopcroft, John An $n$ log $n$ algorithm for minimizing states in a finite automaton.
+ * Theory of machines and computations (Proc. Internat. Sympos., Technion, Haifa, 1971), pp. 189–196. Academic Press, New York, 1971.
+ */
 
 // This transformation is inverse of itself.
 #define REVERSE_INDEX(__NUM__, __INDEX__) (__NUM__) - (__INDEX__) - 1 
@@ -25,25 +32,29 @@ if (FIRST > SECOND) {\
 
 int* find_reachable(DFA *in_dfa, DFA *out_dfa)
 {
-	Queue* queue = create_queue();
-	queue_push(queue, 0);
-
 	int* reachable = (int*) malloc(sizeof(int) * in_dfa->num_states);
-	memset(reachable, 0, sizeof(int) * in_dfa->num_states);
+	memset(reachable + 1, 0, sizeof(int) * in_dfa->num_states - 1);
 
-	int elem, c_elem;
+	Queue* queue = create_queue();
+	// push the start state.
+	queue_push(queue, 0);
+	reachable[0] = 1;
+	out_dfa->num_states++;
+
+	// do BFS on the in_dfa transition Directed Graph.
 	while(!queue_empty(queue)) {
+		int elem, c_elem;
 		elem = queue_pop(queue);
-		if (!reachable[elem]) {
-			reachable[elem] = 1;
-			out_dfa->num_states++;
-			for (int j = 0; j < in_dfa->num_char; j++) {
-				c_elem = in_dfa->transition_func[elem][j];
-				if (!reachable[c_elem])
-					queue_push(queue, c_elem);
+		for (int i = 0; i < in_dfa->num_char; i++) {
+			c_elem = in_dfa->transition_func[elem][i];
+			if (!reachable[c_elem]) {
+				queue_push(queue, c_elem);
+				reachable[c_elem] = 1;
+				out_dfa->num_states++;
 			}
 		}
 	}
+
 	return reachable;
 }
 
@@ -625,7 +636,7 @@ function does not match new state count. LG: %d, NI: %d", last_group, new_index)
 DFA *minimize_dfa(DFA *in_dfa)
 {
 	DFA* out_dfa = remove_unreachable(in_dfa);
-	printf("\nReachable states %d\n", out_dfa->num_states);
+	printf("Reachable states %d\n\n", out_dfa->num_states);
 	out_dfa = remove_indistinguishable(out_dfa);
 	return out_dfa;
 }
@@ -635,7 +646,7 @@ int main(int argc, char **argv)
 	int i, j;
 	check_arg_count(argc, 2, "Usage: mindfa <DFA_FILE>\n");
 	DFA *out_dfa = minimize_dfa(parse_dfa(argv[1]));
-	printf("\n\nOut DFA\n\n");
+	printf("Out DFA\n\n");
 	printf("Num states %d \n", out_dfa->num_states);
 	printf("Num char %d \n", out_dfa->num_char);
 	printf("Transition Function:\n");
@@ -654,6 +665,6 @@ int main(int argc, char **argv)
 	{
 		printf("%d\t", out_dfa->final_states[i]);
 	}
-	printf("\n");
+	printf("\n\n");
 	return 0;
 }

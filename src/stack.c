@@ -5,6 +5,10 @@
 
 #include "common.h"
 
+/**
+ * Create stack with block the size of system
+ * page.
+ */
 Stack* create_stack()
 {
 	int size = get_page_size()/sizeof(Stack);
@@ -15,12 +19,16 @@ Stack* create_stack()
 	return stack;
 }
 
+/** free up the stack memory */
 void destroy_stack(Stack *stack)
 {
 	free(stack->block);
 	free(stack);
 }
 
+/** 
+ * Push with/without resizing.
+ */
 void stack_push(Stack *stack, int elem)
 {
 	if (stack->tail == stack->size) {
