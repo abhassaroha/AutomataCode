@@ -21,16 +21,15 @@ int is_reg_lang_empty(DFA* in_dfa)
 		final[in_dfa->final_states[i]] = 1;
 
 	if (!final[0]) {
+		int *reachable = (int*) malloc(in_dfa->num_states * sizeof(int));
+		memset(reachable + 1, 0, sizeof(int) * (in_dfa->num_states - 1));
+		reachable[0] = 1;
+
 		Stack* stack = create_stack();
 		// push the start state.
 		stack_push(stack, 0);
 
-
-		int *reachable = (int*) malloc(in_dfa->num_states * sizeof(int));
-		memset(reachable + 1, 0, sizeof(int) * in_dfa->num_states - 1);
-		reachable[0] = 1;
-
-		// do a DFS to determine if any final state is reachable.
+		// do an iterative DFS to determine if any final state is reachable.
 		while (!stack_empty(stack)) {
 			int elem, c_elem;
 			elem = stack_pop(stack);
@@ -47,16 +46,14 @@ int is_reg_lang_empty(DFA* in_dfa)
 			}
 		} 
 
-		// free memory 
-		free(reachable);
 		destroy_stack(stack);
+		free(reachable);
 	}
 	else {
 		// start state is final state
 		result = 0;
 	}
 
-	// free memory 
 	free(final);
 
 	return result;
